@@ -1,0 +1,33 @@
+#System
+phi = 0.1
+dim = 2
+Lx = 20.0
+Ly = 20.0
+is_p_x = 1
+is_p_y = 1
+node_protocol = zeros
+sigma = 1.0
+epsilon = 1.0
+kT = 0.0
+
+#Solver
+dt = 0.002
+gamma = 1.0
+va = 0.100000
+
+#Observer
+output_dir = /work/laynefrechette/lj_assembly/
+particles_freq = 100
+thermo_freq = 100
+
+#LabBench
+experiment = standard
+equil_steps = 50000
+production_steps = 100000
+info_freq = 10000
+
+#Active Noise Generator
+nx = 20
+ny = 20
+tau = 1.000000
+lambda = 1.000000
