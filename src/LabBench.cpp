@@ -1,6 +1,6 @@
 #include "LabBench.hpp"
 
-LabBench::LabBench(ParamDict& theParams, gsl_rng*& theGen) : sys(theParams), obs(theParams), solver(sys, theParams, theGen)
+LabBench::LabBench(ParamDict& theParams, gsl_rng*& theGen) : sys(theParams, theGen), obs(theParams), solver(sys, theParams, theGen)
 {
 
     params = theParams;
@@ -52,9 +52,37 @@ void LabBench::do_experiment(std::string expt)
 
 void LabBench::run_standard_experiment()
 {
-    std::cout << "Equilibrating..." << std::endl;
-    this->run(this->equil_steps, "/equil", this->obs.particles_freq, this->obs.thermo_freq);
+    std::cout << "Minimizing energy..." << std::endl;
+    sys.minimize_energy();
 
+    if (sys.particle_protocol=="lattice") {
+        std::cout << "Equilibrating..." << std::endl;
+        double kT0 = sys.kT;
+        double va0 = solver.va;
+        double dt0 = sys.dt;
+        std::string pot = sys.potential_type;
+        
+        //Set "high" temperature and no active noise
+        //to get random initial configuration
+        sys.kT = 0.5;
+        solver.va = 0.0;
+        sys.dt = 0.0002;
+        sys.potential_type = "wca";
+        std::cout << "kT: " << sys.kT << std::endl;;
+        std::cout << "va: " << solver.va << std::endl;
+        std::cout << "potential: " << sys.potential_type << std::endl;
+        std::cout << "dt: " << sys.dt << std::endl;;
+        this->run(this->equil_steps, "/equil", this->obs.particles_freq, this->obs.thermo_freq);
+
+        //reset parameters for production
+        sys.kT = kT0;
+        solver.va = va0;
+        sys.dt = dt0;
+        sys.potential_type = pot;
+    }
     std::cout << "Doing production run..." << std::endl;
+    std::cout << "kT: " << sys.kT << std::endl;;
+    std::cout << "va: " << solver.va << std::endl;
+    std::cout << "potential: " << sys.potential_type << std::endl;
     this->run(this->production_steps, "/prod", this->obs.particles_freq, this->obs.thermo_freq);
 }

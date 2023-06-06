@@ -35,3 +35,11 @@ std::ostream& operator<<(std::ostream& os, Particle& p) {
     arma::vec pos = p.get_pos();
     return os << "Particle with id: " << p.get_id() << " and Pos: (" << pos(0) << ", " << pos(1) << ", " << pos(2) << ")";
 }
+
+double* Particle::get_position() {
+    return pos.memptr();
+}
+
+double* Particle::get_old_position() {
+    return old_pos.memptr();
+}

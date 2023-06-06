@@ -4,7 +4,7 @@ ActiveSolver::ActiveSolver(System &theSys, ParamDict &theParams, gsl_rng *&the_r
 {
     if(theParams.is_key("va")) va = std::stod(theParams.get_value("va"));
     //Modify parameters to make particles and active noise generator consistent 
-    theParams.add_entry("D", theParams.get_value("tau")); //TODO: figure out what the hell this is doing
+    theParams.add_entry("D", std::to_string(va*va)); //Active noise generator will generate values with variance va^2
     double dee_x = theSys.edges[0]/int(std::stoi(theParams.get_value("nx")));
     //Set precision of dx
     std::ostringstream out;
@@ -32,7 +32,9 @@ void ActiveSolver::update(System &theSys)
     //Get conservative forces
     std::vector<arma::vec> potential_forces(theSys.N);
     for (int i=0; i<theSys.N; i++) {
-        arma::vec force = theSys.get_force(theSys.particles[i]);
+        arma::vec force;
+        if (theSys.do_cell_list) force = theSys.get_force_cell_list(theSys.particles[i]);
+        else force = theSys.get_force(theSys.particles[i]);
         potential_forces[i] = force;
     }
 
@@ -41,8 +43,10 @@ void ActiveSolver::update(System &theSys)
     active_forces = get_active_noise_forces(theSys, *anGen);
     
     for (int i=0; i<theSys.N; i++) {
+        theSys.particles[i].old_pos = theSys.particles[i].pos;
         arma::vec pos = theSys.particles[i].get_pos();
         for (int k=0; k<theSys.dim; k++) {
+            if (fabs(potential_forces[i][k])>10000.0) std::cout << "Warning: large lj force: " << potential_forces[i][k] << std::endl;
             //Euler step
             double incr = potential_forces[i](k)/gamma*dt 
                         + active_forces[i](k)*dt;
@@ -56,6 +60,7 @@ void ActiveSolver::update(System &theSys)
     anGen->step(dt); //advance active noise in time
     theSys.apply_pbc();
     theSys.time++;
+    if (theSys.do_cell_list) theSys.update_neighborgrid();
 }
 
 std::vector<arma::vec> ActiveSolver::get_active_noise_forces(System &theSys, Generator &gen)
@@ -68,6 +73,12 @@ std::vector<arma::vec> ActiveSolver::get_active_noise_forces(System &theSys, Gen
         active_forces[i] = v;
     } 
 
+    //if active velocity is zero, don't bother doing calculation
+    if (va<1e-10) {
+        //std::cout << "Active speed is zero." << std::endl;
+        return active_forces;
+    }
+
     //Compute real-space noise
     arma::field<arma::cx_vec> xi = gen.get_xi_r(1); //do_fft=1
 
@@ -75,29 +86,29 @@ std::vector<arma::vec> ActiveSolver::get_active_noise_forces(System &theSys, Gen
         //Assign active force to each particle based on location in noise grid
         for(int i=0; i<theSys.N; i++) {
             arma::vec pos = theSys.particles[i].get_pos();
-            int xind = std::round((pos(0)+0.5*theSys.edges[0])/gen.dx);
-            int yind = std::round((pos(1)+0.5*theSys.edges[1])/gen.dx);
-            int zind = std::round((pos(2)+0.5*theSys.edges[2])/gen.dx);
-            for(int j=0; j<3; j++) active_forces[i](j) = va*xi(xind,yind,zind)(j).real(); //va is the active velocity
+            int xind = int((pos(0)+0.5*theSys.edges[0])/gen.dx);
+            int yind = int((pos(1)+0.5*theSys.edges[1])/gen.dx);
+            int zind = int((pos(2)+0.5*theSys.edges[2])/gen.dx);
+            for(int j=0; j<3; j++) active_forces[i](j) = xi(xind,yind,zind)(j).real(); 
         }
     }
     else if (theSys.dim==2) {
         //Assign active force to each particle based on location in noise grid
         for(int i=0; i<theSys.N; i++) {
             arma::vec pos = theSys.particles[i].get_pos();
-            int xind = std::round((pos(0)+0.5*theSys.edges[0])/gen.dx);
-            int yind = std::round((pos(1)+0.5*theSys.edges[1])/gen.dx);
-            //std::cout << i << "x comp: " << va*xi(xind,yind)(0).real() << std::endl;
-            //std::cout << i << "y comp: " << va*xi(xind,yind)(1).real() << std::endl;
-            for(int j=0; j<2; j++) active_forces[i](j) = va*xi(xind,yind)(j).real(); //va is the active velocity
+            int xind = int((pos(0)+0.5*theSys.edges[0])/gen.dx);
+            int yind = int((pos(1)+0.5*theSys.edges[1])/gen.dx);
+            for(int j=0; j<2; j++) active_forces[i](j) = xi(xind,yind)(j).real(); 
+            if (fabs(active_forces[i][0])>100.0) std::cout << "Warning: large active force: " << active_forces[i][0] << std::endl;
+            if (fabs(active_forces[i][1])>100.0) std::cout << "Warning: large active force: " << active_forces[i][1] << std::endl;
         }
     }
     else if (theSys.dim==1) {
         //Assign active force to each particle based on location in noise grid
         for(int i=0; i<theSys.N; i++) {
             arma::vec pos = theSys.particles[i].get_pos();
-            int xind = std::round((pos(0)+0.5*theSys.edges[0])/gen.dx);
-            active_forces[i](0) = va*xi(xind)(0).real(); //va is the active velocity
+            int xind = int((pos(0)+0.5*theSys.edges[0])/gen.dx);
+            active_forces[i](0) = xi(xind)(0).real(); 
         }
     }
 

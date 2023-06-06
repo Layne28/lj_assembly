@@ -1,0 +1,5 @@
+seed*
+*.in
+*.conf
+log/*
+build/*

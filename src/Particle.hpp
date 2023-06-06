@@ -15,6 +15,7 @@ private:
     
 public:
     arma::vec pos;
+    arma::vec old_pos;
     arma::vec vel;
 
     //constructor
@@ -26,9 +27,13 @@ public:
     int get_id();
     arma::vec get_pos();
     bool is_equal(Particle &p);
+    void move();
 
     //'<<' overload for std::cout
     friend std::ostream& operator<<(std::ostream& os, Particle& p);
+
+    double *get_position();
+    double *get_old_position();
 };
 
 #endif
