@@ -42,8 +42,9 @@ public:
     std::vector<double> edges; //box dimensions
     std::vector<int> is_periodic; //periodic or not in each dimension
 
-    int do_cell_list = 0; //whether to use the cell list (neighbor grid) for computing forces
-    NeighborGrid<Particle, 2> grid;
+    int do_cell_list = 1; //whether to use the cell list (neighbor grid) for computing forces
+    //NeighborGrid<Particle, 2> grid;
+    NeighborGrid<Particle, 2> *grid;
 
     /*** Methods ***/
 
@@ -62,6 +63,7 @@ public:
     //Get (some of these could be made static)
     arma::vec get_com();
     double get_energy();
+    double get_energy_cell_list();
     double get_lj_potential(double r, double sig, double eps, double rc);
     double get_wca_potential(double r, double sig, double eps);
     arma::vec get_force_cell_list(Particle &p);

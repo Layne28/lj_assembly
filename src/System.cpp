@@ -47,6 +47,7 @@ System::System(ParamDict &theParams, gsl_rng *&the_rg) {
     if(theParams.is_key("epsilon")) epsilon = std::stod(theParams.get_value("epsilon"));
     if(theParams.is_key("sigma")) sigma = std::stod(theParams.get_value("sigma"));
     if(theParams.is_key("rcut")) rcut = std::stod(theParams.get_value("rcut"));
+    if(theParams.is_key("do_cell_list")) do_cell_list = std::stoi(theParams.get_value("do_cell_list"));
 
     //Compute parameters that are inferred from other parameters
     double volume = 1.0;
@@ -156,6 +157,12 @@ System::System(ParamDict &theParams, gsl_rng *&the_rg) {
     }
 
     this->apply_pbc();
+
+    //Initialize cell list
+    std::array<double,2> min = {-0.5*edges[0], -0.5*edges[1]};
+    std::array<double,2> max = {0.5*edges[0], 0.5*edges[1]};
+    std::array<bool,2> p = {true, true};
+    grid = new NeighborGrid<Particle, 2>(min, max, p, rcut+1.0);
 }
 
 System::~System() {}
@@ -205,21 +212,48 @@ void System::set_obs(Observer &anObs) {
 
 double System::get_energy()
 {
+    if (do_cell_list==1) return get_energy_cell_list();
+    else{
+        double energy = 0;
+        for (int i=0; i<N-1; i++) {
+            for (int j=i+1; j<N; j++) {
+                double dist = get_dist(particles[i], particles[j]);
+                if (dist<=rcut) {
+                    if (potential_type=="lj"){
+                        energy += get_lj_potential(dist, sigma, epsilon, rcut);
+                    }
+                    else if(potential_type=="wca"){
+                        energy += get_wca_potential(dist, sigma, epsilon);
+                    }
+                }
+            }
+        }
+        return energy;
+    }
+}
+
+double System::get_energy_cell_list () {
+
     double energy = 0;
-    for (int i=0; i<N-1; i++) {
-        for (int j=i+1; j<N; j++) {
-            double dist = get_dist(particles[i], particles[j]);
+    
+    for(int i=0; i<N; i++){
+        Particle *p1 = &particles[i];
+        std::vector<Particle *> neighbors = grid->get_neighbors(p1);
+        for(unsigned int j=0; j<neighbors.size(); j++){
+            Particle *p2 = neighbors[j];
+            double dist = get_dist(*p1, *p2);
+            if (dist<1e-10) std::cout << "Error: particles overlap!" << std::endl;
             if (dist<=rcut) {
                 if (potential_type=="lj"){
-                    energy += get_lj_potential(dist, sigma, epsilon, rcut);
+                    energy += get_lj_potential(dist, sigma, epsilon, rcut); 
                 }
                 else if(potential_type=="wca"){
-                    energy += get_wca_potential(dist, sigma, epsilon);
+                    energy += get_wca_potential(dist, sigma, epsilon); 
                 }
             }
         }
     }
-    return energy;
+    return energy/2.0; //correct for double-counting neighbors
 }
 
 double System::get_lj_potential(double r, double sig, double eps, double rc) {
@@ -248,8 +282,23 @@ double System::get_wca_potential(double r, double sig, double eps) {
 arma::vec System::get_force_cell_list (Particle &p1) {
 
     arma::vec force(dim, arma::fill::zeros);
+    
+    std::vector<Particle *> neighbors = grid->get_neighbors(&p1);
+    //std::cout << neighbors.size() << std::endl;
+    for(unsigned int j=0; j<neighbors.size(); j++){
+        Particle *p2 = neighbors[j];
+        double dist = get_dist(p1, *p2);
+        if (dist<=rcut) {
+            arma::vec disp = get_disp_vec(p1, *p2);
+            if (potential_type=="lj"){
+                force += get_lj_force(dist, disp, sigma, epsilon); 
+            }
+            else if(potential_type=="wca"){
+                force += get_wca_force(dist, disp, sigma, epsilon); 
+            }
+        }
+    }
     /*
-    std::vector<Particle *> neighbors = grid.get_neighbors(&p1);
     for (auto p2 = neighbors.begin(); p2!= neighbors.end(); p2++) {
         double dist = get_dist(p1, **p2);
         arma::vec disp = get_disp_vec(p1, **p2);
@@ -267,24 +316,27 @@ arma::vec System::get_force_cell_list (Particle &p1) {
 //O(N^2) calculation of forces (w/o cell list)
 arma::vec System::get_force (Particle &p1) {
 
-    arma::vec force(dim, arma::fill::zeros);
-    
-    for (int j=0; j<N; j++) {
-        if (particles[j].get_id()!=p1.get_id()) {
-            double dist = get_dist(p1, particles[j]);
-            if (dist<1e-15) throw std::runtime_error("ERROR: attempting to divide by zero in force calculation!");
-            if (dist<=rcut) {
-                arma::vec disp = get_disp_vec(p1, particles[j]);
-                if (potential_type=="lj"){
-                    force += get_lj_force(dist, disp, sigma, epsilon); 
-                }
-                else if(potential_type=="wca"){
-                    force += get_wca_force(dist, disp, sigma, epsilon); 
+    if(do_cell_list==1) return get_force_cell_list(p1);
+    else{
+        arma::vec force(dim, arma::fill::zeros);
+        
+        for (int j=0; j<N; j++) {
+            if (particles[j].get_id()!=p1.get_id()) {
+                double dist = get_dist(p1, particles[j]);
+                if (dist<1e-15) throw std::runtime_error("ERROR: attempting to divide by zero in force calculation!");
+                if (dist<=rcut) {
+                    arma::vec disp = get_disp_vec(p1, particles[j]);
+                    if (potential_type=="lj"){
+                        force += get_lj_force(dist, disp, sigma, epsilon); 
+                    }
+                    else if(potential_type=="wca"){
+                        force += get_wca_force(dist, disp, sigma, epsilon); 
+                    }
                 }
             }
         }
+        return force;
     }
-    return force;
 }
 
 arma::vec System::get_lj_force(double r, arma::vec rvec, double sig, double eps) {
@@ -312,8 +364,8 @@ arma::vec System::get_wca_force(double r, arma::vec rvec, double sig, double eps
 double System::minimize_energy(double tol) {
     std::cout << "Starting energy: " << get_energy() << std::endl;
     double diff_norm = 1.0; //normalized energy difference bt current and previous steps
-    int max_iter = 10000;
-    double eps = 1e-4; //gradient descent step size
+    int max_iter = 1000;
+    double eps = 1e-3;//1e-4; //gradient descent step size
 
     for(int t=0; t<max_iter; t++) {
         double e_old = get_energy();
@@ -382,6 +434,6 @@ Observer System::get_obs() {
 void System::update_neighborgrid() {
 
     for(int i=0; i<N; i++) {
-        grid.update_atom(&particles[i]);
+        grid->update_atom(&particles[i]);
     }
 }

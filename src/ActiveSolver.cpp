@@ -32,9 +32,7 @@ void ActiveSolver::update(System &theSys)
     //Get conservative forces
     std::vector<arma::vec> potential_forces(theSys.N);
     for (int i=0; i<theSys.N; i++) {
-        arma::vec force;
-        if (theSys.do_cell_list) force = theSys.get_force_cell_list(theSys.particles[i]);
-        else force = theSys.get_force(theSys.particles[i]);
+        arma::vec force = theSys.get_force(theSys.particles[i]);
         potential_forces[i] = force;
     }
 

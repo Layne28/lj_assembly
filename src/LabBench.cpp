@@ -66,7 +66,7 @@ void LabBench::run_standard_experiment()
         //to get random initial configuration
         sys.kT = 0.5;
         solver.va = 0.0;
-        sys.dt = 0.0002;
+        sys.dt = 0.00025;
         sys.potential_type = "wca";
         std::cout << "kT: " << sys.kT << std::endl;;
         std::cout << "va: " << solver.va << std::endl;

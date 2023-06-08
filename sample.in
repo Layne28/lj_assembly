@@ -1,14 +1,15 @@
 #System
-phi = 0.6
+phi = 0.4
 dim = 2
-Lx = 10.0
-Ly = 10.0
+Lx = 200.0
+Ly = 200.0
 is_p_x = 1
 is_p_y = 1
 particle_protocol = lattice
 sigma = 1.0
 epsilon = 1.0
 kT = 0.3
+do_cell_list = 1
 
 #Solver
 dt = 0.0005
@@ -16,20 +17,21 @@ gamma = 1.0
 va = 0.300000
 
 #Observer
-output_dir = /work/laynefrechette/lj_assembly/
-particles_freq = 1000
-thermo_freq = 1000
+output_dir = /work/laynefrechette/lj_assembly/big_test
+particles_freq = 10
+thermo_freq = 10
+input_freq = 10
 
 #LabBench
 experiment = standard
-equil_steps = 500000
+equil_steps = 500
 #equil_steps = 10000
-production_steps = 100000
+production_steps = 1000
 #production_steps = 100000
-info_freq = 1000
+info_freq = 100
 
 #Active Noise Generator
-nx = 10
-ny = 10
+nx = 400
+ny = 400
 tau = 1.000000
 lambda = 1.000000
