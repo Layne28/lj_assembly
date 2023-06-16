@@ -30,11 +30,7 @@ ActiveSolver::~ActiveSolver()
 void ActiveSolver::update(System &theSys)
 {
     //Get conservative forces
-    std::vector<arma::vec> potential_forces(theSys.N);
-    for (int i=0; i<theSys.N; i++) {
-        arma::vec force = theSys.get_force(theSys.particles[i]);
-        potential_forces[i] = force;
-    }
+    std::vector<arma::vec> potential_forces = theSys.get_forces();
 
     //Get active noise force on each particle
     std::vector<arma::vec> active_forces;
@@ -58,7 +54,7 @@ void ActiveSolver::update(System &theSys)
     anGen->step(dt); //advance active noise in time
     theSys.apply_pbc();
     theSys.time++;
-    if (theSys.do_cell_list) theSys.update_neighborgrid();
+    if (theSys.do_neighbor_grid) theSys.update_neighborgrid();
 }
 
 std::vector<arma::vec> ActiveSolver::get_active_noise_forces(System &theSys, Generator &gen)

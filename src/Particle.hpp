@@ -14,12 +14,13 @@ private:
     int id;
     
 public:
+    int d;
     arma::vec pos;
     arma::vec old_pos;
     arma::vec vel;
 
     //constructor
-    Particle(int dim=3);
+    Particle(int dim=2);
 
     //destructor
     ~Particle();

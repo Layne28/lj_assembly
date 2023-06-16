@@ -22,7 +22,74 @@ System::System(ParamDict &theParams, gsl_rng *&the_rg) {
     epsilon = 1.0;
     rcut = 2.5;
 
-    //Get number of dimensions from ParamDict
+    //Then assign from ParamDict if there
+    do_paramdict_assign(theParams);
+
+    //Initialize Particles
+    do_particle_init();
+
+    //Initialize periodic image indices
+    for (int i=0; i<N; i++) {
+        std::vector<int> index(dim, 0);
+        image.push_back(index);
+    }
+    this->apply_pbc();
+
+    //Update old position to equal position after pbc
+    for(int i=0; i<N; i++){
+        particles[i].old_pos = particles[i].pos;
+    }
+
+    //Initialize neighbor grid
+    if(do_neighbor_grid==1){
+        std::array<double,2> min = {-0.5*edges[0], -0.5*edges[1]};
+        std::array<double,2> max = {0.5*edges[0], 0.5*edges[1]};
+        std::array<bool,2> p = {true, true};
+        grid = new NeighborGrid<Particle, 2>(min, max, p, rcut);
+        update_neighborgrid();
+    }
+
+    //Initialize cell list
+    if(do_cell_list==1){
+        if(dim!=2) {
+            std::cout << "Error: cell lists not yet supported in d!=2." << std::endl;
+            exit(-1);
+        }
+        ncell_x = int(edges[0]/rcut);
+        ncell_y = int(edges[1]/rcut);
+        cellsize_x = edges[0]/ncell_x;
+        cellsize_y = edges[1]/ncell_y;
+        if (fabs(ncell_x*cellsize_x-edges[0]>1e-3) || fabs(ncell_y*cellsize_y-edges[1]>1e-3)){
+            std::cout << "Error: cell list dimensions computed incorrectly." << std::endl;
+            exit(-1);
+        }
+        head = new int[ncell_x*ncell_y];
+        list = new int[N];
+        cellndx = new int[N];
+        cellneigh = new int *[ncell_x*ncell_y];
+        for(int i=0; i<ncell_x*ncell_y; i++) {
+            cellneigh[i] = new int[9]; //at most 8 neighbor cells in 2D
+        }
+        fill_cellneigh();
+    }
+}
+
+System::~System() {
+
+    //clean up cell list
+    if(do_cell_list==1){
+        delete[] head;
+        delete[] list;
+        delete[] cellndx;
+        for(int i=0; i<ncell_x*ncell_y; i++) {
+            delete[] cellneigh[i];
+        }
+        delete[] cellneigh;
+    }
+}
+
+void System::do_paramdict_assign(ParamDict &theParams) {
+
     if(theParams.is_key("dim")) dim = std::stoi(theParams.get_value("dim"));
     //Make "edges" and "is_periodic" vectors the correct size
     for(int i=0; i<dim; i++) {
@@ -39,7 +106,6 @@ System::System(ParamDict &theParams, gsl_rng *&the_rg) {
         if(i==2 && theParams.is_key("is_p_z")) is_periodic[i] = std::stoi(theParams.get_value("is_p_z")); //read in value
     }
 
-    //Then assign from ParamDict if there
     if(theParams.is_key("kT")) kT = std::stod(theParams.get_value("kT"));
     if(theParams.is_key("phi")) phi = std::stod(theParams.get_value("phi"));
     if(theParams.is_key("dt")) dt = std::stod(theParams.get_value("dt"));
@@ -48,6 +114,7 @@ System::System(ParamDict &theParams, gsl_rng *&the_rg) {
     if(theParams.is_key("sigma")) sigma = std::stod(theParams.get_value("sigma"));
     if(theParams.is_key("rcut")) rcut = std::stod(theParams.get_value("rcut"));
     if(theParams.is_key("do_cell_list")) do_cell_list = std::stoi(theParams.get_value("do_cell_list"));
+    if(theParams.is_key("do_neighbor_grid")) do_neighbor_grid = std::stoi(theParams.get_value("do_neighbor_grid"));
 
     //Compute parameters that are inferred from other parameters
     double volume = 1.0;
@@ -72,8 +139,28 @@ System::System(ParamDict &theParams, gsl_rng *&the_rg) {
     N = std::round(phi*volume/particle_volume); 
     if (phi==0.0) N = 1;
     std::cout << "No. of particles: " << N << std::endl;
+}
 
-    //Initialize Particles
+void System::apply_pbc() {
+
+    for (int i=0; i<N; i++) {
+        for (int j=0; j<dim; j++) {
+            if (is_periodic[j]) {
+                if (particles[i].pos[j] < -0.5*edges[j]) {
+                    particles[i].pos[j] += edges[j];
+                    image[i][j] -= 1;
+                }
+                if (particles[i].pos[j] >= 0.5*edges[j]) {
+                    particles[i].pos[j] -= edges[j];
+                    image[i][j] += 1;
+                }
+            }
+        }
+    }
+}
+
+void System::do_particle_init() {
+
     if (particle_protocol=="zeros") {
         for (int i=0; i<N; i++) {
             Particle p(dim);
@@ -127,6 +214,7 @@ System::System(ParamDict &theParams, gsl_rng *&the_rg) {
                     if (j%2==1) p.pos[0] += 0.5*a;
                     p.pos[1] = (sqrt(3.0)/2.0)*j*a;//-edges[1]/2.0;
                     p.pos[2] = 0.0;
+                    p.old_pos = p.pos;
                     count++;
                     particles.push_back(p);
                 }
@@ -148,40 +236,6 @@ System::System(ParamDict &theParams, gsl_rng *&the_rg) {
     }
     else {
         throw std::runtime_error("Error: Particle initialization protocol not supported.");
-    }
-
-    //Initialize periodic image indices
-    for (int i=0; i<N; i++) {
-        std::vector<int> index(dim, 0);
-        image.push_back(index);
-    }
-
-    this->apply_pbc();
-
-    //Initialize cell list
-    std::array<double,2> min = {-0.5*edges[0], -0.5*edges[1]};
-    std::array<double,2> max = {0.5*edges[0], 0.5*edges[1]};
-    std::array<bool,2> p = {true, true};
-    grid = new NeighborGrid<Particle, 2>(min, max, p, rcut+1.0);
-}
-
-System::~System() {}
-
-void System::apply_pbc() {
-
-    for (int i=0; i<N; i++) {
-        for (int j=0; j<dim; j++) {
-            if (is_periodic[j]) {
-                if (particles[i].pos[j] < -0.5*edges[j]) {
-                    particles[i].pos[j] += edges[j];
-                    image[i][j] -= 1;
-                }
-                if (particles[i].pos[j] >= 0.5*edges[j]) {
-                    particles[i].pos[j] -= edges[j];
-                    image[i][j] += 1;
-                }
-            }
-        }
     }
 }
 
@@ -210,38 +264,77 @@ void System::set_obs(Observer &anObs) {
     obs = &anObs;
 }
 
-double System::get_energy()
-{
+double System::get_energy() {
     if (do_cell_list==1) return get_energy_cell_list();
+    else if (do_neighbor_grid==1) return get_energy_neighbor_grid();
     else{
         double energy = 0;
         for (int i=0; i<N-1; i++) {
             for (int j=i+1; j<N; j++) {
-                double dist = get_dist(particles[i], particles[j]);
-                if (dist<=rcut) {
-                    if (potential_type=="lj"){
-                        energy += get_lj_potential(dist, sigma, epsilon, rcut);
-                    }
-                    else if(potential_type=="wca"){
-                        energy += get_wca_potential(dist, sigma, epsilon);
-                    }
-                }
+                energy += get_energy_between(particles[i], particles[j]);
             }
         }
         return energy;
     }
 }
 
-double System::get_energy_cell_list () {
+double System::get_energy_between(Particle &p1, Particle &p2) {
 
     double energy = 0;
-    
+    double dist = get_dist(p1, p2);
+    if (dist<=rcut) {
+        if (potential_type=="lj"){
+            energy = get_lj_potential(dist, sigma, epsilon, rcut);
+        }
+        else if(potential_type=="wca"){
+            energy = get_wca_potential(dist, sigma, epsilon);
+        }
+    }
+
+    return energy;
+}
+
+double System::get_energy_cell_list() {
+
+    double energy = 0;
+
+    //update cell list
+    create_cell_list();
+
+    //Loop over cells (including self)
+    for (int index1 = N-1; index1 >= 0; index1--) {
+        int icell = cellndx[index1];
+        int index2 = head[icell];
+        for (int nc = 0; nc < cellneigh[icell][0]; nc++) {
+            int jcell = cellneigh[icell][nc+1];
+            index2 = head[jcell];
+            while (index2 != -1) {
+                if(index1>index2){
+                    double de = get_energy_between(particles[index1], particles[index2]);
+                    energy += de;
+                }
+                index2 = list[index2];
+            }
+        }
+    }
+    return energy;//*0.5; //correct for double-counting
+}
+
+double System::get_energy_neighbor_grid() {
+
+    double energy = 0;
+
+    update_neighborgrid();
+
     for(int i=0; i<N; i++){
-        Particle *p1 = &particles[i];
-        std::vector<Particle *> neighbors = grid->get_neighbors(p1);
+        /*
+        for (auto p2 = grid->get_neighbor_iterator(&particles[i]); !p2.isDone(); p2++){ 
+            std::cout << *p2 << std::endl;
+        */
+        std::vector<Particle *> neighbors = grid->get_neighbors(&particles[i]);
         for(unsigned int j=0; j<neighbors.size(); j++){
             Particle *p2 = neighbors[j];
-            double dist = get_dist(*p1, *p2);
+            double dist = get_dist(particles[i], *p2);
             if (dist<1e-10) std::cout << "Error: particles overlap!" << std::endl;
             if (dist<=rcut) {
                 if (potential_type=="lj"){
@@ -278,15 +371,74 @@ double System::get_wca_potential(double r, double sig, double eps) {
     else return 0;
 }
 
-//Force with cell list
-arma::vec System::get_force_cell_list (Particle &p1) {
+//O(N^2) calculation of forces (w/o cell list)
 
+std::vector<arma::vec> System::get_forces() {
+    
+    if(do_cell_list==1) return get_forces_cell_list();
+    else{
+        std::vector<arma::vec> forces(N);
+        for(int i=0; i<N; i++) {
+            arma::vec force(dim);
+            if(do_neighbor_grid==1) force = get_force_neighbor_grid(particles[i]);
+            else force = get_force(particles[i]);
+            forces[i] = force;
+        }
+        return forces;
+    }
+}
+
+
+arma::vec System::get_force(Particle &p1) {
+    
     arma::vec force(dim, arma::fill::zeros);
     
+    for (int j=0; j<N; j++) {
+        if (particles[j].get_id()!=p1.get_id()) {
+            double dist = get_dist(p1, particles[j]);
+            if (dist<1e-15) throw std::runtime_error("ERROR: attempting to divide by zero in force calculation!");
+            if (dist<=rcut) {
+                arma::vec disp = get_disp_vec(p1, particles[j]);
+                if (potential_type=="lj"){
+                    force += get_lj_force(dist, disp, sigma, epsilon); 
+                }
+                else if(potential_type=="wca"){
+                    force += get_wca_force(dist, disp, sigma, epsilon); 
+                }
+            }
+        }
+    }
+    return force;
+}
+
+arma::vec System::get_force_from(Particle &p1, Particle &p2) {
+    
+    arma::vec force(dim, arma::fill::zeros);
+    
+    double dist = get_dist(p1, p2);
+    if (dist<1e-15) throw std::runtime_error("ERROR: attempting to divide by zero in force calculation!");
+    if (dist<=rcut) {
+        arma::vec disp = get_disp_vec(p1, p2);
+        if (potential_type=="lj"){
+            force = get_lj_force(dist, disp, sigma, epsilon); 
+        }
+        else if(potential_type=="wca"){
+            force = get_wca_force(dist, disp, sigma, epsilon); 
+        }
+    }
+    return force;
+}
+
+//Force with neighbor grid
+arma::vec System::get_force_neighbor_grid(Particle &p1) {
+
+    arma::vec force(dim, arma::fill::zeros);
+    /*
+    for (auto p2 = grid->get_neighbor_iterator(&p1); !p2.isDone(); p2++){
+    */
     std::vector<Particle *> neighbors = grid->get_neighbors(&p1);
-    //std::cout << neighbors.size() << std::endl;
     for(unsigned int j=0; j<neighbors.size(); j++){
-        Particle *p2 = neighbors[j];
+        Particle *p2 = neighbors[j];  
         double dist = get_dist(p1, *p2);
         if (dist<=rcut) {
             arma::vec disp = get_disp_vec(p1, *p2);
@@ -298,46 +450,44 @@ arma::vec System::get_force_cell_list (Particle &p1) {
             }
         }
     }
-    /*
-    for (auto p2 = neighbors.begin(); p2!= neighbors.end(); p2++) {
-        double dist = get_dist(p1, **p2);
-        arma::vec disp = get_disp_vec(p1, **p2);
-        if (potential_type=="lj"){
-            force += get_lj_force(dist, disp, sigma, epsilon); 
-        }
-        else if(potential_type=="wca"){
-            force += get_wca_force(dist, disp, sigma, epsilon); 
-        }
-    }
-    */
     return force;
 }
 
-//O(N^2) calculation of forces (w/o cell list)
-arma::vec System::get_force (Particle &p1) {
+//TODO: fill this in
 
-    if(do_cell_list==1) return get_force_cell_list(p1);
-    else{
+std::vector<arma::vec> System::get_forces_cell_list() {
+
+    //update cell list
+    create_cell_list();
+
+    //Initialize forces to zero
+    std::vector<arma::vec> forces(N);
+    for(int i=0; i<N; i++){
         arma::vec force(dim, arma::fill::zeros);
-        
-        for (int j=0; j<N; j++) {
-            if (particles[j].get_id()!=p1.get_id()) {
-                double dist = get_dist(p1, particles[j]);
-                if (dist<1e-15) throw std::runtime_error("ERROR: attempting to divide by zero in force calculation!");
-                if (dist<=rcut) {
-                    arma::vec disp = get_disp_vec(p1, particles[j]);
-                    if (potential_type=="lj"){
-                        force += get_lj_force(dist, disp, sigma, epsilon); 
-                    }
-                    else if(potential_type=="wca"){
-                        force += get_wca_force(dist, disp, sigma, epsilon); 
-                    }
+        forces[i] = force;
+    }
+
+    //Loop over cells (including self)
+    for (int index1 = N-1; index1 >= 0; index1--) {
+        int icell = cellndx[index1];
+        int index2 = head[icell];
+        for (int nc = 0; nc < cellneigh[icell][0]; nc++) {
+            int jcell = cellneigh[icell][nc+1];
+            index2 = head[jcell];
+            while (index2 != -1) {
+                if(index1>index2){
+                    arma::vec fij = get_force_from(particles[index1], particles[index2]);
+                    forces[index1] += fij;
+                    forces[index2] -= fij; //Newton's 3rd law
                 }
+                index2 = list[index2];
             }
         }
-        return force;
     }
+
+    return forces;
 }
+
 
 arma::vec System::get_lj_force(double r, arma::vec rvec, double sig, double eps) {
 
@@ -371,14 +521,11 @@ double System::minimize_energy(double tol) {
         double e_old = get_energy();
         
         //Get forces
-        std::vector<arma::vec> potential_forces(N);
-        for (int i=0; i<N; i++) {
-            arma::vec force = get_force(particles[i]);
-            potential_forces[i] = force;
-        }
+        std::vector<arma::vec> potential_forces = get_forces();
 
         //Update positions
         for (int i=0; i<N; i++) {
+            particles[i].old_pos = particles[i].pos;
             for (int k=0; k<dim; k++) {
                 particles[i].pos[k] += potential_forces[i](k)*eps;
             }
@@ -436,4 +583,60 @@ void System::update_neighborgrid() {
     for(int i=0; i<N; i++) {
         grid->update_atom(&particles[i]);
     }
+}
+
+/*** Cell list methods ***/
+
+// assign each particle to a cell
+void System::create_cell_list() {
+   int icell;
+   for (int i = 0; i < ncell_x*ncell_y; i++) {
+      head[i] = -1;
+   }
+   for (int i = 0; i < N; i++) {
+      //Assume pbc in [-L_mu/2, L_mu/2] for mu=x,y
+      double shiftx = particles[i].pos[0] + edges[0]/2.0;
+      double shifty = particles[i].pos[1] + edges[1]/2.0;
+      icell = int(shiftx/cellsize_x) + int(shifty/cellsize_y)*ncell_x;
+      if(icell>ncell_x*ncell_y) std::cout << "WARNING: icell=" << icell << std::endl;
+      cellndx[i] = icell;
+      list[i] = head[icell];
+      if(list[i]>=N){
+         std::cout << "WARNING: list[i]=" << list[i] << std::endl;
+         exit(-1);
+      }
+      head[icell] = i;
+   }
+}
+
+// find neighboring cells of each cell
+void System::fill_cellneigh() {
+    int icell, jcell, nneigh;
+    int jx, jy;
+    for (int ix = 0; ix < ncell_x; ix++) {
+        for (int iy = 0; iy < ncell_y; iy++) {
+            icell = ix + iy*ncell_x;
+            nneigh = 0;
+            for (int i = -1; i < 2; i++) {
+                jx = ix+i;
+                //Enforce pbc
+                if(jx<0) jx += ncell_x;
+                if(jx>=ncell_x) jx -= ncell_x;
+                for (int j = -1; j < 2; j++) {
+                    jy = iy+j;
+                    //Enforce pbc
+                    if(jy<0) jy += ncell_y;
+                    if(jy>=ncell_y) jy -= ncell_y;
+                    jcell = jx + jy*ncell_x;
+                    cellneigh[icell][nneigh+1] = jcell;
+                    nneigh++;
+                }
+            }
+            cellneigh[icell][0] = nneigh;
+            if(nneigh!=9){
+                std::cout << "Error: number of neighbors (" << nneigh << ") should be 9 including cell itself." << std::endl;
+                exit(-1);
+            }
+      }
+   }
 }

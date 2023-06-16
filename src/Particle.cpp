@@ -5,7 +5,9 @@
 int Particle::counter = 0;
 
 Particle::Particle(int dim) {
+    d = dim;
     pos.zeros(dim);
+    old_pos.zeros(dim);
     vel.zeros(dim);
     id = Particle::counter;
     Particle::counter++;
@@ -33,7 +35,15 @@ bool Particle::is_equal(Particle &p){
 
 std::ostream& operator<<(std::ostream& os, Particle& p) {
     arma::vec pos = p.get_pos();
-    return os << "Particle with id: " << p.get_id() << " and Pos: (" << pos(0) << ", " << pos(1) << ", " << pos(2) << ")";
+    if (p.d==3){
+        return os << "Particle with id: " << p.get_id() << " and Pos: (" << pos(0) << ", " << pos(1) << ", " << pos(2) << ")";
+    } else if(p.d==2){
+       return os << "Particle with id: " << p.get_id() << " and Pos: (" << pos(0) << ", " << pos(1) << ")"; 
+    }
+    else{
+        std::cout << "Error: num of dims not supported." << std::endl;
+        exit(-1);
+    }
 }
 
 double* Particle::get_position() {

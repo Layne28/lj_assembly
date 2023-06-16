@@ -31,7 +31,7 @@ CXXFLAGS:= -std=c++17 -Wextra -pedantic -Wall -W -Wmissing-declarations -Wuninit
 # Compiler flags controling optimization levels. Use -O3 for full optimization,
 # but make sure your results are consistent
 # -g includes debugging information. You can also add -pg here for profiling 
-PROFILE=-pg
+PROFILE=-g -pg
 OPTFLAGS:=$(PROFILE) -O2
 
 # Flags to pass to the linker; -lm links in the standard c math library

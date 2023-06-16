@@ -55,6 +55,32 @@ void LabBench::run_standard_experiment()
     std::cout << "Minimizing energy..." << std::endl;
     sys.minimize_energy();
 
+    /*
+    std::cout << "Testing grid" << std::endl;
+    
+    std::array<double,2> min = {-0.5*sys.edges[0], -0.5*sys.edges[1]};
+    std::array<double,2> max = {0.5*sys.edges[0], 0.5*sys.edges[1]};
+    std::array<bool,2> per = {true, true};
+    NeighborGrid<Particle, 2> *grid = new NeighborGrid<Particle,2>(min, max, per, 3.5);
+    //grid->update_atom(&sys.particles[0]);
+    //grid->update_atom(&sys.particles[1]);
+    //grid->update_atom(&sys.particles[2]);
+    //auto p = grid->get_neighbor_iterator(&sys.particles[0]);
+    //std::cout << *p << std::endl;
+    Particle p1;
+    p1.pos[0]=0.0;
+    p1.pos[1]=0.0;
+    Particle p2;
+    p2.pos[0] = 1.0;
+    p2.pos[1] = 0.0;
+    grid->update_atom(&p1);
+    grid->update_atom(&p2);
+    for (auto p = grid->get_neighbor_iterator(&p1); !p.isDone(); p++){ 
+        std::cout << *p << std::endl;
+    }
+    std::cout << "passed" << std::endl;
+    */
+
     if (sys.particle_protocol=="lattice") {
         std::cout << "Equilibrating..." << std::endl;
         double kT0 = sys.kT;

@@ -23,17 +23,12 @@ Solver::~Solver() {}
 
 void Solver::update(System &theSys)
 {
-    std::vector<arma::vec> forces(theSys.N);
-    for(int i=0; i<theSys.N; i++)
-    {
-        arma::vec force = theSys.get_force(theSys.particles[i]);
-        forces[i] = force;
-    }
+    std::vector<arma::vec> forces = theSys.get_forces();
 
     for(int i=0; i<theSys.N; i++)
     {
         arma::vec pos = theSys.particles[i].get_pos();
-        for(int k=0; k<3; k++)
+        for(int k=0; k<theSys.dim; k++)
         {
             //TODO: implement alternatives to Euler (RK2, etc.)
             double incr = forces[i](k)/gamma*dt + sqrt(2*D)*gsl_ran_gaussian(rg, sqrt(dt));
