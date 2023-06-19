@@ -19,6 +19,8 @@ def main():
     parser.add_argument('--sigma', default='1.0')
     parser.add_argument('--epsilon', default='1.0')
     parser.add_argument('--kT', default='0.0')
+    parser.add_argument('--do_cell_list', default='1')
+    parser.add_argument('--do_neighbor_grid', default='0')
 
     #Solver args
     parser.add_argument('--dt', default='0.0002')
@@ -65,6 +67,8 @@ def main():
         f.write('sigma = %s\n' % args.sigma)
         f.write('epsilon = %s\n' % args.epsilon)
         f.write('kT = %s\n' % args.kT)
+        f.write('do_cell_list = %s\n' % args.do_cell_list)
+        f.write('do_neighbor_grid = %s\n' % args.do_neighbor_grid)
         f.write('\n')
 
         f.write('#Solver\n')
