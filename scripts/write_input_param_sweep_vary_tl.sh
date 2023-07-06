@@ -13,7 +13,7 @@ equil_steps=40000
 production_steps=4000000
 
 taus=(0.01 0.10 0.30 1.00 10.00)
-lambdas=(1.00 2.00 3.00 5.00 10.00)
+lambdas=(0.50 1.00 2.00 3.00 5.00 10.00)
 phis=(0.20 0.40 0.60)
 
 for tau in "${taus[@]}"
