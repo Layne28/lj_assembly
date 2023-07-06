@@ -7,10 +7,13 @@ ny=$4
 tau=$5 #default to 10
 lambda=$6 #default to 10
 
-dt=0.00025
-freq=800
-equil_steps=40000
-production_steps=4000000
+dt=0.0002
+freq=1000
+equil_steps=50000
+production_steps=5000000
+
+base_out_dir="/expanse/lustre/projects/brs104/lfrechette/"
+
 #phis=(0.00 0.10 0.20 0.30 0.40 0.50 0.60 0.70 0.80)
 phis=(0.20 0.40 0.60)
 kTs=(0.0 0.1 0.3 0.5 1.0)
@@ -23,7 +26,7 @@ do
     do
         for va in "${vas[@]}"
         do
-            python3 scripts/write_input_file.py input_files --va $va --tau $tau --Lambda $lambda --kT $kT --phi $phi --Lx $Lx --Ly $Ly --nx $nx --ny $ny --particles_freq $freq --thermo_freq $freq --dt $dt --equil_steps=$equil_steps --production_steps=$production_steps --particle_protocol "lattice" --output_dir "/work/laynefrechette/lj-assembly-results/kT=${kT}/phi=${phi}/va=${va}/tau=${tau}/lambda=${lambda}/Lx=${Lx}_Ly=${Ly}/nx=${nx}_ny=${ny}"
+            python3 scripts/write_input_file.py input_files --va $va --tau $tau --Lambda $lambda --kT $kT --phi $phi --Lx $Lx --Ly $Ly --nx $nx --ny $ny --particles_freq $freq --thermo_freq $freq --dt $dt --equil_steps=$equil_steps --production_steps=$production_steps --particle_protocol "lattice" --output_dir "${base_out_dir}/lj-assembly-results/kT=${kT}/phi=${phi}/va=${va}/tau=${tau}/lambda=${lambda}/Lx=${Lx}_Ly=${Ly}/nx=${nx}_ny=${ny}"
         done
     done
 done

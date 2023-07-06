@@ -1,0 +1,87 @@
+Running assembly simulation with input file: input_files/lj_assembly_kT=1.0_phi=0.20_va=1.00_tau=10.00_lambda=10.00_Lx=100.0_Ly=100.0_nx=200_ny=200.in
+Using input file: input_files/lj_assembly_kT=1.0_phi=0.20_va=1.00_tau=10.00_lambda=10.00_Lx=100.0_Ly=100.0_nx=200_ny=200.in
+Reading seed from file.
+/expanse/lustre/projects/brs104/lfrechette//lj-assembly-results/kT=1.0/phi=0.20/va=1.00/tau=10.00/lambda=10.00/Lx=100.0_Ly=100.0/nx=200_ny=200/seed=1
+Using seed: 30614
+No. of particles: 2546
+spacing: 2.11351
+0.0002
+sum to 1? 1
+Initialized generator.
+200
+Running standard experiment.
+Minimizing energy...
+Starting energy: -252.676
+Attempted energy minimization for max iterations without converging.
+End energy: -284.02
+Equilibrating...
+kT: 0.5
+va: 0
+potential: wca
+dt: 0.00025
+/expanse/lustre/projects/brs104/lfrechette//lj-assembly-results/kT=1.0/phi=0.20/va=1.00/tau=10.00/lambda=10.00/Lx=100.0_Ly=100.0/nx=200_ny=200/seed=1//equil/traj.h5
+step 0
+step 8000
+step 16000
+step 24000
+step 32000
+step 40000
+step 48000
+Doing production run...
+kT: 1
+va: 1
+potential: lj
+/expanse/lustre/projects/brs104/lfrechette//lj-assembly-results/kT=1.0/phi=0.20/va=1.00/tau=10.00/lambda=10.00/Lx=100.0_Ly=100.0/nx=200_ny=200/seed=1//prod/traj.h5
+step 0
+step 8000
+step 16000
+step 24000
+step 32000
+step 40000
+step 48000
+step 56000
+step 64000
+step 72000
+step 80000
+step 88000
+step 96000
+step 104000
+step 112000
+step 120000
+step 128000
+step 136000
+step 144000
+step 152000
+step 160000
+step 168000
+step 176000
+step 184000
+step 192000
+step 200000
+step 208000
+step 216000
+step 224000
+step 232000
+step 240000
+step 248000
+step 256000
+step 264000
+step 272000
+step 280000
+step 288000
+step 296000
+step 304000
+step 312000
+step 320000
+step 328000
+step 336000
+step 344000
+step 352000
+step 360000
+step 368000
+step 376000
+step 384000
+step 392000
+step 400000
+step 408000
+step 416000

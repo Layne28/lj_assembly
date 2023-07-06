@@ -19,6 +19,7 @@ public:
 
     /*** Variables ***/
     double va = 1.0;
+    double force_thresh = 200.0;
 
     /*** Methods ***/
 
@@ -31,8 +32,14 @@ public:
     //Take a step forward in time
     void update(System &theSys);
 
+    //Lower the timestep if forces are too large
+    void update_adaptive(System &theSys, double deet, int level);
+
     //use fft to compute real-space active noise on grid
     std::vector<arma::vec> get_active_noise_forces(System &theSys, Generator &gen);
+
+    //Get thermal forces
+    std::vector<arma::vec> get_thermal_forces(System &theSys, double deet);
 
 private:
     Generator* anGen; //active noise generator

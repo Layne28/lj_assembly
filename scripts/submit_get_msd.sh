@@ -11,7 +11,7 @@
 folder=$1
 tmax=$2
 
-run_dir="/home/laynefrechette/lj_assembly/scripts"
+run_dir="/home/lfrechette/lj_assembly/scripts"
 
 python3 $run_dir/get_msd.py $folder $tmax
 
